@@ -93,4 +93,5 @@ try:
             continue
         getTextAndLinks(response)
 except Exception as e:
+    # Error log
     print(e)
