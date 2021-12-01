@@ -24,7 +24,7 @@ while True:
     documentsIdList = list()
     for i in documents:
         documentsIdList.append(i['_id'])
-        explictContentList.append(i['explictContent'])
+        explictContentList.append(i['matchedContent'])
     
     for key, value in enumerate(predictor.predict_prob(explictContentList)):
         updateData = {
