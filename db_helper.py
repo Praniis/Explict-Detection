@@ -22,67 +22,40 @@ def upsertInSentenceScores(insertData, crawledPageId):
     db.ExplictDetect.SentenceScores.insert_many(insertData)
 
 
-def addToURLQueue(url):
-    db.ExplictDetect.urlQueue.update_one({'_id': 'urlQueue'}, {
-        '$addToSet': {'queuedURL': url}
-    })
-
-
-def moveQueuedURLToProcessed(url):
-    db.ExplictDetect.urlQueue.update_one({'_id': 'urlQueue'}, {
-        '$pull': {'queuedURL': url},
-        '$addToSet': {'processedURL': url}
-    })
-
-
-def moveQueuedURLToUnProcessed(url):
-    db.ExplictDetect.urlQueue.update_one({'_id': 'urlQueue'}, {
-        '$pull': {'queuedURL': url},
-        '$addToSet': {'unProcessedURL': url}
-    })
-
-
-def getURLFromQueue(nos=1):
-    result = db.ExplictDetect.urlQueue.find_one({'_id': 'urlQueue'}, {'queuedURL': {'$slice': nos}})
-    if result and result['queuedURL'] and len(result['queuedURL']):
-        return result['queuedURL']
-    else:
-        return []
-
-
-def isExistsInQueuedURL(url):
-    result = db.ExplictDetect.urlQueue.find_one({'_id': 'urlQueue', 'queuedURL': url })
-    return True if result else False
-
-
-def isExistsInProcessedURL(url):
-    result = db.ExplictDetect.urlQueue.find_one({'_id': 'urlQueue', 'processedURL': url })
-    return True if result else False
-
-
-def isExistsInUnProcessedURL(url):
-    result = db.ExplictDetect.urlQueue.find_one({'_id': 'urlQueue', 'unProcessedURL': url })
-    return True if result else False
-
-
-def isExistsInURLQueueCollection(link):
-    result = db.ExplictDetect.urlQueue.find_one({
-        '$and': [
-            { '_id': 'urlQueue' },
-            { '$or': [
-                { 'queuedURL': link },
-                { 'processedURL': link },
-                { 'unProcessedURL': link }
-            ]}
-        ]
-    })
-    return True if result else False
-
-def clearQueue():
-    db.ExplictDetect.urlQueue.update_one({'_id': 'urlQueue'}, {
+def addToCrawlURL(url):
+    db.ExplictDetect.crawledURL.update_one({
+        'url': url,
+    }, {
         '$set': {
-            'queuedURL': [],
-            'processedURL': [],
-            'unProcessedURL': []
+            'url': url,
+            'status': 'queued'
+        }
+    }, upsert=True)
+
+
+def updateCrawlStatus(url, crawlStatus):
+    db.ExplictDetect.crawledURL.update_one({ 'url': url }, {
+        '$set': {
+            'status': crawlStatus
         }
     })
+
+
+def getURLFromQueue(nos = 1):
+    results = db.ExplictDetect.crawledURL.find({ 'status': 'queued' }).limit(nos)
+    if results:
+        urls = []
+        for result in results:
+            urls.append(result['url'])
+        return urls
+    else:
+        return []        
+
+
+def isExistsInCrawlURL(url):
+    result = db.ExplictDetect.crawledURL.find_one({ 'url': url })
+    return True if result else False
+
+
+def clearCrawledURL():
+    db.ExplictDetect.crawledURL.delete_many({})

@@ -1,5 +1,6 @@
 import sys
 import validators
+from concurrent.futures import ThreadPoolExecutor
 from os.path import splitext
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -69,13 +70,20 @@ def detectPageContent(url, resText):
         if (
             parseResult.netloc == parseLink.netloc and
             not linkExt in BLOCKED_EXTS and
-            not isExistsInURLQueueCollection(link)
+            not isExistsInCrawlURL(link)
         ):
-            addToURLQueue(link)
+            addToCrawlURL(link)
 
+def processResponse(response):
+    url, resText = response['url'], response['resText']
+    if response['success']:
+        detectPageContent(url, resText)
+        updateCrawlStatus(url, 'success')
+    else:
+        updateCrawlStatus(url, 'fail')
 
 def scrapQueuedURL():
-    MAX_TRESHOLD = 15
+    MAX_TRESHOLD = 20
     try:
         while True:
             urls = getURLFromQueue(MAX_TRESHOLD)
@@ -84,20 +92,19 @@ def scrapQueuedURL():
                 startTime = datetime.now()
                 print(f"[CRAWL]  Processing           {totalURLs} URLs")
                 responses = makeParallelReq(urls)
-                print(f"[CRAWL]  Completed Processing {totalURLs} URLs in    {datetime.now()-startTime}")
+                print(f"[CRAWL]  Completed Processing {totalURLs} URLs in {datetime.now()-startTime}")
                 startTimeML = datetime.now()
                 print(f"[ML]     Processing           {totalURLs} URLs")
-                for response in responses:
-                    url, resText = response['url'], response['resText']
-                    if response['success']:
-                        detectPageContent(url, resText)
-                        moveQueuedURLToProcessed(url)
-                    else:
-                        moveQueuedURLToUnProcessed(url)
-                print(f"[ML]     Completed Processing     {totalURLs} URLs in {datetime.now()-startTimeML}")
-                print(f"[REPORT] Total Time                                   {datetime.now()-startTime}\n\n")
+
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    for response in responses:
+                        executor.submit(processResponse, response)
+                
+                print(f"[ML]     Completed Processing {totalURLs} URLs in {datetime.now()-startTimeML}")
+                print(f"[REPORT] Total Time                      {datetime.now()-startTime}\n\n")
             else:
                 break
+
     except Exception as e:
         print(e)
 
@@ -121,7 +128,7 @@ def getURLFromUser():
         if not validators.url(url):
             print("[INVALID] Kindly enter a valid url")
             sys.exit(0)
-        addToURLQueue(url)
+        addToCrawlURL(url)
     except KeyboardInterrupt:
         sys.exit(0)
 
@@ -132,26 +139,13 @@ def getURLAndStartScrap():
 
 
 if __name__ == '__main__':
-    urlQueueCount = db.ExplictDetect.urlQueue.find_one({'_id': 'urlQueue'}, {
-        'queuedURL': {'$size': '$queuedURL'},
-        'processedURL': {'$size': '$processedURL'},
-        'unProcessedURL': {'$size': '$unProcessedURL'}
-    })
-
-    if urlQueueCount == None:
-        db.ExplictDetect.urlQueue.insert_one({
-            '_id': 'urlQueue',
-            'queuedURL': [],
-            'processedURL': [],
-            'unProcessedURL': [],
-        })
-        getURLAndStartScrap()
-    elif urlQueueCount['queuedURL'] == 0:
-        getURLAndStartScrap()
-    else:
+    urlQueueCount = db.ExplictDetect.crawledURL.find({'status': 'queued'}).count()
+    if urlQueueCount:
         userChoice = input("Do you want to continue old progress (Y/n)? ")
         if userChoice.lower() == 'y':
             scrapQueuedURL()
         else:
-            clearQueue()
+            clearCrawledURL()
             getURLAndStartScrap()
+    else:
+        getURLAndStartScrap()
