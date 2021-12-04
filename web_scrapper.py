@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from database import client as db
 from db_helper import *
 from http_client import makeParallelReq
-from text_analyze import processText
+from text_analyze import processTextAndSaveDB
 
 
 BLOCKED_EXTS = [
@@ -48,10 +48,12 @@ def detectPageContent(url, resText):
 
     insertedData = upsertInCrawledPage(insertData)
     crawledPageId = insertedData.upserted_id
+    startTime = datetime.now()
     if crawledPageId != None:
-        pageSentenceScores = processText(str(bodyContent))
-        upsertInSentenceScores(pageSentenceScores, crawledPageId)
+        processTextAndSaveDB(str(bodyContent), crawledPageId)
+    print(datetime.now()-startTime)
 
+    tempCacheCrawlURL = set()
     for a in soup.find_all('a', href=True):
         link = a.get('href') if not(a.get('rel') and 'nofollow' in a.get('rel')) else ''
         if link == '':
@@ -66,21 +68,20 @@ def detectPageContent(url, resText):
         if not validators.url(link):
             continue
 
-        linkExt = splitext(parseLink.path)[1]
+        linkExt = splitext(parseLink.path)[1]        
         if (
             parseResult.netloc == parseLink.netloc and
-            not linkExt in BLOCKED_EXTS and
-            not isExistsInCrawlURL(link)
+            not (linkExt in BLOCKED_EXTS) and
+            not (link in tempCacheCrawlURL)
         ):
-            addToCrawlURL(link)
+            if len(tempCacheCrawlURL) < 500:
+                tempCacheCrawlURL.add(link)
+            else:
+                addToCrawlURL(tempCacheCrawlURL)
+                tempCacheCrawlURL = set()
+    if len(tempCacheCrawlURL):
+        addToCrawlURL(tempCacheCrawlURL)
 
-def processResponse(response):
-    url, resText = response['url'], response['resText']
-    if response['success']:
-        detectPageContent(url, resText)
-        updateCrawlStatus(url, 'success')
-    else:
-        updateCrawlStatus(url, 'fail')
 
 def scrapQueuedURL():
     MAX_TRESHOLD = 20
@@ -96,10 +97,13 @@ def scrapQueuedURL():
                 startTimeML = datetime.now()
                 print(f"[ML]     Processing           {totalURLs} URLs")
 
-                with ThreadPoolExecutor(max_workers=8) as executor:
-                    for response in responses:
-                        executor.submit(processResponse, response)
-                
+                for response in responses:
+                    url, resText = response['url'], response['resText']
+                    if response['success']:
+                        detectPageContent(url, resText)
+                        updateCrawlStatus(url, 'success')
+                    else:
+                        updateCrawlStatus(url, 'fail')
                 print(f"[ML]     Completed Processing {totalURLs} URLs in {datetime.now()-startTimeML}")
                 print(f"[REPORT] Total Time                      {datetime.now()-startTime}\n\n")
             else:
@@ -128,7 +132,7 @@ def getURLFromUser():
         if not validators.url(url):
             print("[INVALID] Kindly enter a valid url")
             sys.exit(0)
-        addToCrawlURL(url)
+        addToCrawlURL([url])
     except KeyboardInterrupt:
         sys.exit(0)
 

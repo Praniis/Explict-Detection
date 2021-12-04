@@ -1,3 +1,4 @@
+from pymongo import UpdateOne, UpdateMany
 from database import client as db
 from datetime import datetime
 
@@ -11,30 +12,39 @@ def upsertInCrawledPage(insertData):
         '$set': insertData
     }, upsert=True)
 
-
-def upsertInSentenceScores(insertData, crawledPageId):
+def upsertInSentenceScores(insertData):
+    bulkWriteSS = list()
     for i in insertData:
-        i['crawledPageId'] = crawledPageId
-        i['updatedAt'] = datetime.now()
-    db.ExplictDetect.SentenceScores.delete_many({
-        "crawledPageId": crawledPageId
-    })
-    db.ExplictDetect.SentenceScores.insert_many(insertData)
+        if len(bulkWriteSS) < 500:
+            bulkWriteSS.append(UpdateOne({
+                'crawledPageId': i['crawledPageId'],
+                'text': i['text']
+            }, {
+                '$set': i
+            }, upsert=True))
+        else:
+            db.ExplictDetect.SentenceScores.bulk_write(bulkWriteSS)
+            bulkWriteSS = list()
+    if len(bulkWriteSS):
+        db.ExplictDetect.SentenceScores.bulk_write(bulkWriteSS)
 
 
-def addToCrawlURL(url):
-    db.ExplictDetect.crawledURL.update_one({
-        'url': url,
-    }, {
-        '$set': {
+def addToCrawlURL(urls):
+    bulkWrites = list()
+    for url in urls:
+        bulkWrites.append(UpdateMany({
             'url': url,
-            'status': 'queued'
-        }
-    }, upsert=True)
-
+        }, {
+            '$setOnInsert': {
+                'url': url,
+                'status': 'queued'
+            }
+        }, upsert = True))
+    db.ExplictDetect.crawledURL.bulk_write(bulkWrites) 
+    
 
 def updateCrawlStatus(url, crawlStatus):
-    db.ExplictDetect.crawledURL.update_one({ 'url': url }, {
+    db.ExplictDetect.crawledURL.update_many({ 'url': url }, {
         '$set': {
             'status': crawlStatus
         }
@@ -43,13 +53,13 @@ def updateCrawlStatus(url, crawlStatus):
 
 def getURLFromQueue(nos = 1):
     results = db.ExplictDetect.crawledURL.find({ 'status': 'queued' }).limit(nos)
+    urls = set()
     if results:
-        urls = []
         for result in results:
-            urls.append(result['url'])
+            urls.add(result['url'])
         return urls
     else:
-        return []        
+        return urls
 
 
 def isExistsInCrawlURL(url):
