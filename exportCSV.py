@@ -38,6 +38,7 @@ pipeline = [
         }
     }, {
         '$addFields': {
+            'Webpage': {'$concat': ['https://', '$hostname', '$url']},
             'sentence': '$SentenceScores.text',
             'sentenceScore': '$SentenceScores.score'
         }
@@ -51,6 +52,8 @@ pipeline = [
     }, {
         '$project': {
             '_id': 0,
+            'hostname': 0,
+            'url': 0,
             'metaData': 0,
             'SentenceScores': 0,
             'rawHTML': 0
@@ -59,19 +62,19 @@ pipeline = [
 ]
 
 if hostname:
-    pipeline.index(0, {
+    pipeline.insert(0, {
         '$match': {
             'hostname': hostname
         }
     })
 
-print("Retriving....")
+print('Retriving....')
 time = datetime.now()
 file = f'./report/csv-out {time}.csv'
-results = db.ExplictDetect.crawledPage.aggregate(pipeline)
-print("Retrived")
+results = db.ExplictDetect.crawledPage.aggregate(pipeline, allowDiskUse=True)
+print('Retrived')
 
-print("Writing to file....")
+print('Writing to file....')
 results = list(results)
 if len(results):
     keys = results[0].keys()
@@ -80,5 +83,5 @@ if len(results):
         dw.writeheader()
         dw.writerows(results)
     print(f'CSV file exported at {file}')
-else: 
-    print("No Data found in given conditions")
+else:
+    print('No Data found in given conditions')
