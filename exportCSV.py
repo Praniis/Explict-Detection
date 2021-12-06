@@ -70,7 +70,7 @@ if hostname:
 
 print('Retriving....')
 time = datetime.now()
-file = f'./report/csv-out {time}.csv'
+file = f'./report/{hostname}csv-out {time}.csv'
 results = db.ExplictDetect.crawledPage.aggregate(pipeline, allowDiskUse=True)
 print('Retrived')
 
