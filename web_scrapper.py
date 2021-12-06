@@ -48,10 +48,8 @@ def detectPageContent(url, resText):
 
     insertedData = upsertInCrawledPage(insertData)
     crawledPageId = insertedData.upserted_id
-    startTime = datetime.now()
     if crawledPageId != None:
         processTextAndSaveDB(str(bodyContent), crawledPageId)
-    print(datetime.now()-startTime)
 
     tempCacheCrawlURL = set()
     for a in soup.find_all('a', href=True):
@@ -96,7 +94,6 @@ def scrapQueuedURL():
                 print(f"[CRAWL]  Completed Processing {totalURLs} URLs in {datetime.now()-startTime}")
                 startTimeML = datetime.now()
                 print(f"[ML]     Processing           {totalURLs} URLs")
-
                 for response in responses:
                     url, resText = response['url'], response['resText']
                     if response['success']:
@@ -108,7 +105,6 @@ def scrapQueuedURL():
                 print(f"[REPORT] Total Time                      {datetime.now()-startTime}\n\n")
             else:
                 break
-
     except Exception as e:
         print(e)
 

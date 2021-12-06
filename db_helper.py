@@ -1,4 +1,4 @@
-from pymongo import UpdateOne, UpdateMany
+from pymongo import UpdateOne
 from database import client as db
 from datetime import datetime
 
@@ -15,7 +15,7 @@ def upsertInCrawledPage(insertData):
 def upsertInSentenceScores(insertData):
     bulkWriteSS = list()
     for i in insertData:
-        if len(bulkWriteSS) < 500:
+        if len(bulkWriteSS) < 1000:
             bulkWriteSS.append(UpdateOne({
                 'crawledPageId': i['crawledPageId'],
                 'text': i['text']
@@ -32,7 +32,7 @@ def upsertInSentenceScores(insertData):
 def addToCrawlURL(urls):
     bulkWrites = list()
     for url in urls:
-        bulkWrites.append(UpdateMany({
+        bulkWrites.append(UpdateOne({
             'url': url,
         }, {
             '$setOnInsert': {
@@ -41,7 +41,7 @@ def addToCrawlURL(urls):
             }
         }, upsert = True))
     db.ExplictDetect.crawledURL.bulk_write(bulkWrites) 
-    
+
 
 def updateCrawlStatus(url, crawlStatus):
     db.ExplictDetect.crawledURL.update_many({ 'url': url }, {
