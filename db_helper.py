@@ -15,7 +15,7 @@ def upsertInCrawledPage(insertData):
 def upsertInSentenceScores(insertData):
     bulkWriteSS = list()
     for i in insertData:
-        if len(bulkWriteSS) < 1000:
+        if len(bulkWriteSS) < 200:
             bulkWriteSS.append(UpdateOne({
                 'crawledPageId': i['crawledPageId'],
                 'text': i['text']

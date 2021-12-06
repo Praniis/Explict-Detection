@@ -13,9 +13,9 @@ def processTextAndSaveDB(pageText, crawledPageId):
     paragraph = ' '.join([tag.text for tag in soup.findAll(TAGS)])
     tokenizedParagraph = ' '.join(word_tokenize(paragraph))
     sentences = sent_tokenize(tokenizedParagraph)
-    windowSize = 1000
+    pageSentenceScores = list()
+    windowSize = 500
     for i, j in enumerate(range(0, len(sentences), windowSize)):
-        pageSentenceScores = list()
         selected = sentences[j: j + windowSize]
         scales = predict_prob(selected)
         for index, sentence in enumerate(selected):
@@ -26,4 +26,5 @@ def processTextAndSaveDB(pageText, crawledPageId):
                 'updatedAt': datetime.now()
             }
             pageSentenceScores.append(pageSentenceScore)
+    if len(pageSentenceScores):
         upsertInSentenceScores(pageSentenceScores)
